@@ -17,7 +17,7 @@ Quỹ thời gian: ~1–2h. Nhẹ về tay, nhưng đây là lúc đặt "luật
 - **.NET 10 SDK** đã cài. Kiểm tra: mở terminal, chạy `dotnet --version` → phải ra số bắt đầu bằng `10.` (vd `10.0.100`). Nếu chưa có, tải ở [dotnet.microsoft.com/download/dotnet/10.0](https://dotnet.microsoft.com/download/dotnet/10.0).
 - **Git** đã cài: `git --version` ra số bất kỳ là được.
 - Một editor: Visual Studio 2022 (17.13+), Rider, hoặc VS Code + C# Dev Kit.
-- Terminal mở tại thư mục gốc repo (`d:\projects\eventhub`) — nơi có file `EventHub.slnx`.
+- Terminal mở tại **thư mục gốc repo** — nơi có file `EventHub.slnx`.
 
 ## Các bước (làm theo thứ tự)
 

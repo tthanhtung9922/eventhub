@@ -19,7 +19,7 @@ Mặc định, mỗi file `.csproj` tự khai version của từng package nó d
 
 ## 1.2. Tạo file (cách nhanh nhất)
 
-Tại thư mục gốc repo (`d:\projects\eventhub`, nơi có `EventHub.slnx`), chạy:
+Tại **thư mục gốc repo** (nơi có file `EventHub.slnx`), chạy:
 
 ```bash
 dotnet new packagesprops
