@@ -29,7 +29,7 @@ Mô tả bằng lời:
 Các lệnh CLI liên quan (chạy được, không phải code):
 
 ```bash
-dotnet new tool-manifest          # tạo .config/dotnet-tools.json (1 lần)
+dotnet new tool-manifest          # tạo manifest (1 lần) — mặc định ở .config/dotnet-tools.json; repo này để ở gốc (dotnet-tools.json), cả hai đều được dotnet tool restore nhận
 dotnet tool install dotnet-ef     # cài vào manifest cục bộ
 dotnet tool restore               # máy khác clone về thì restore tool
 dotnet ef --version               # xác nhận chạy được

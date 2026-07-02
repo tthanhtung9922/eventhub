@@ -21,7 +21,7 @@ Mô tả bằng lời (bạn tự gõ):
 1. **Định nghĩa `IModule`.** Một interface với (tối thiểu) hai thành viên:
    - Một method nhận `IServiceCollection` (+ `IConfiguration` nếu cần) để module **đăng ký service** của nó vào DI (DbContext, handler, option...).
    - Một method nhận `IEndpointRouteBuilder` để module **map endpoint** Minimal API của nó.
-   > TODO mentor: chốt **nơi đặt `IModule`** — `EventHub.SharedKernel` hay một project nền tảng riêng (vd một `EventHub.Modularity`)? Cân nhắc: SharedKernel tiện nhưng đang là "viên gạch domain"; project riêng sạch hơn về trách nhiệm. Ghi lựa chọn + lý do.
+   > **Quyết định đã chốt (ghi lại):** đặt `IModule` ở **project Shared riêng `src/Shared/EventHub.Modularity`** — *không* nhét vào `SharedKernel`. Lý do: `SharedKernel` là "viên gạch domain" (`Result<T>`, guard, domain-event base); còn `IModule` phụ thuộc kiểu ASP.NET Core (`IEndpointRouteBuilder`, `IServiceCollection`) — trộn vào SharedKernel sẽ kéo phụ thuộc web vào lớp domain thuần. Tách project riêng giữ trách nhiệm sạch. Việc phát sinh (không ghi ở scaffold Day 1 vì lúc đó chưa cần): `dotnet new classlib` project này, `dotnet sln add`, thêm `FrameworkReference` `Microsoft.AspNetCore.App`, rồi các module Api + host reference nó.
 
 2. **Module Identity hiện thực `IModule`.** Trong `src/Modules/Identity/EventHub.Identity.Api`, tạo một class hiện thực `IModule`: phần đăng ký service gọi vào Infrastructure (DbContext...), phần map endpoint khai các route của Identity. Nhớ từ [notes Day 1](../day-01/notes.md): project này là `Microsoft.NET.Sdk` thường nên cần **`FrameworkReference` tới `Microsoft.AspNetCore.App`** để dùng được `IEndpointRouteBuilder` / `MapGet` — **không** đổi sang SDK `.Web`.
 

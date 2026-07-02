@@ -13,9 +13,9 @@ Chạy lại chuỗi kiểm chứng tổng (hạ tầng → build → migration 
 Chạy tuần tự, mỗi lệnh phải qua mới sang lệnh sau:
 
 ```bash
-# 1. Hạ tầng lên và healthy
-docker compose -f docker/docker-compose.yml up -d
-docker compose -f docker/docker-compose.yml ps
+# 1. Hạ tầng lên và healthy (--env-file .env vì .env ở gốc, compose ở docker/)
+docker compose --env-file .env -f docker/docker-compose.yml up -d
+docker compose --env-file .env -f docker/docker-compose.yml ps
 
 # 2. Solution build sạch
 dotnet build EventHub.slnx

@@ -66,7 +66,7 @@ Câu hỏi: host nạp **bằng cách nào**? Hai lựa chọn:
 
 Đây là một dạng **Plugin / Convention over configuration**: host không biết tên module cụ thể, chỉ biết "ai hiện thực `IModule` thì được nạp".
 
-> TODO mentor: chốt **nơi đặt `IModule`** — `EventHub.SharedKernel` (vì là viên gạch dùng chung nội bộ) hay một project nền tảng riêng? Và cách host **tìm** các `IModule`: quét assembly bằng reflection, hay đăng ký tường minh danh sách module? Cân nhắc đánh đổi (reflection tiện nhưng khó trace; tường minh rõ ràng nhưng thủ công). Ghi lại lựa chọn + lý do.
+> **Quyết định đã chốt:** `IModule` đặt ở project Shared riêng **`EventHub.Modularity`** (không nhét vào `SharedKernel` để tránh kéo phụ thuộc ASP.NET Core vào lớp domain thuần). Host tìm module bằng **danh sách tường minh** (explicit registry) thay vì reflection — để trace được và tránh lỗi "assembly chưa nạp thì quét ra rỗng". Chi tiết đánh đổi ở [notes.md — Ghi chú 2](notes.md) và [Bước 4](04-module-pattern.md).
 
 > **Góc kể phỏng vấn:** *"Host của tôi không wire tay từng module. Mỗi module hiện thực `IModule` tự đăng ký service và endpoint; host quét và gọi qua `AddModules`/`UseModules`. Thêm module mới không phải đụng composition root."*
 

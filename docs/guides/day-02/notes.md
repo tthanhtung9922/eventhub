@@ -25,6 +25,8 @@ Vậy **căn cứ** khẳng định "pipeline EF chạy thông" **không** phả
 
 **Vế đúng:** pattern `IModule` + `AddModules`/`UseModules` đóng gói "module đăng ký service gì + map endpoint gì" vào **chính module**, thay vì rải lời gọi `AddX()`/`MapX()` khắp `Program.cs` của host. Gần với **Open/Closed** (mở rộng bằng thêm module) + **Single Responsibility** (mỗi module tự lo phần mình).
 
+**Nơi đặt `IModule` (chốt lại — phát sinh so với scaffold Day 1):** interface nằm ở một **project Shared thứ 3 mới**, `src/Shared/EventHub.Modularity` — *không* ở `SharedKernel`. Vì `IModule` phụ thuộc kiểu web (`IEndpointRouteBuilder`, `IServiceCollection`, `IConfiguration`), còn `SharedKernel` phải sạch (chỉ `Result<T>`, guard, domain-event) — trộn vào sẽ kéo phụ thuộc ASP.NET Core xuống lớp domain. Project này là `Microsoft.NET.Sdk` thường + `FrameworkReference Microsoft.AspNetCore.App` (đúng bài "library dùng nhờ kiểu ASP.NET Core", xem [notes Day 1 — ghi chú 2](../day-01/notes.md)). Day 1 mới có 2 project Shared (SharedKernel + Contracts); đây là cái thứ 3, sinh khi thực sự cần ở Day 2.
+
 **Đính chính nuance (dễ nói quá lời):** mức "không sửa gì khi thêm module" **tùy cách host tìm module**:
 
 - **Explicit list (đang dùng):** host giữ một registry tường minh (`[new IdentityModule(), ...]`). Thêm module = **thêm đúng 1 dòng** vào registry — không phải "zero sửa", mà là *sửa một chỗ tập trung, nhỏ, đã biết trước*.

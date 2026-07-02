@@ -33,17 +33,19 @@ Mô tả bằng lời (bạn tự gõ YAML):
 Tại gốc repo:
 
 ```bash
-docker compose -f docker/docker-compose.yml up -d
-docker compose -f docker/docker-compose.yml ps
+docker compose --env-file .env -f docker/docker-compose.yml up -d
+docker compose --env-file .env -f docker/docker-compose.yml ps
 ```
+
+> **Bắt buộc `--env-file .env`:** `.env` ở gốc repo, compose ở `docker/`; Compose lấy thư mục chứa `-f` làm project dir nên không tự nạp `.env` ở gốc. Thiếu cờ này thì `${POSTGRES_USER}`… rỗng → Postgres dựng lên với user/mật khẩu rỗng (hỏng). Kiểm nhanh: `docker compose --env-file .env -f docker/docker-compose.yml config` xem giá trị đã được thay chưa. *(Cách khác: khai `env_file:` trong từng service để compose tự chứa.)*
 
 - Cả ba service phải lên; cột trạng thái chuyển sang `healthy` sau vài giây (chờ healthcheck).
 - Mở MinIO console trên trình duyệt (port console đã map) đăng nhập bằng root user/password — vào được là MinIO ổn.
 - Kiểm tra dữ liệu bền:
 
 ```bash
-docker compose -f docker/docker-compose.yml down
-docker compose -f docker/docker-compose.yml up -d
+docker compose --env-file .env -f docker/docker-compose.yml down
+docker compose --env-file .env -f docker/docker-compose.yml up -d
 ```
 
 `down` (không kèm `-v`) rồi `up` lại — dữ liệu vẫn còn nhờ named volume.

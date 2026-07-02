@@ -51,7 +51,7 @@ Hai cờ giải thích: `--project` trỏ project chứa DbContext (nơi migrati
 Xác nhận đã áp vào Postgres — vào container Postgres kiểm tra bảng hệ thống:
 
 ```bash
-docker compose -f docker/docker-compose.yml exec postgres psql -U <user> -d <db> -c "\dt"
+docker compose --env-file .env -f docker/docker-compose.yml exec postgres psql -U <user> -d <db> -c "\dt"
 ```
 
 Phải thấy bảng **`__EFMigrationsHistory`** (và bảng placeholder nếu dùng Hướng A). Có nó nghĩa là migration đã áp thành công.
