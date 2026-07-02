@@ -12,6 +12,7 @@
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/EventHub.Contracts/EventHub.Contracts.csproj" />
+    <Project Path="src/Shared/EventHub.Modularity/EventHub.Modularity.csproj" />
     <Project Path="src/Shared/EventHub.SharedKernel/EventHub.SharedKernel.csproj" />
   </Folder>
 </Solution>

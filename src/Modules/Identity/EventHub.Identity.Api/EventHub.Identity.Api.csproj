@@ -1,5 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <ProjectReference Include="..\EventHub.Identity.Application\EventHub.Identity.Application.csproj" />
+    <ProjectReference Include="..\EventHub.Identity.Infrastructure\EventHub.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\Shared\EventHub.Modularity\EventHub.Modularity.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference the Microsoft.AspNetCore.App framework to use ASP.NET Core features -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <PropertyGroup>
   </PropertyGroup>
 
