@@ -69,9 +69,9 @@ EventHub/
 │   │
 │   ├── Modules/
 │   │   ├── Identity/
-│   │   │   ├── EventHub.Identity.Domain/         # User, Role, RefreshToken
-│   │   │   ├── EventHub.Identity.Application/     # Login, Register handlers
-│   │   │   ├── EventHub.Identity.Infrastructure/  # EF, JWT service, DbContext
+│   │   │   ├── EventHub.Identity.Domain/         # RefreshToken (POCO thuần, UserId ref)
+│   │   │   ├── EventHub.Identity.Application/     # Login/Register handlers, IIdentityService
+│   │   │   ├── EventHub.Identity.Infrastructure/  # ApplicationUser/Role, DbContext, JWT + IdentityService
 │   │   │   └── EventHub.Identity.Api/             # Minimal API endpoints
 │   │   │
 │   │   ├── Events/
@@ -147,7 +147,7 @@ Mục tiêu: solution Modular Monolith chạy được với **1 module hoàn ch
 |------|------|--------|
 | 1 | Khởi tạo `EventHub.slnx`, cấu trúc thư mục, Central Package Management, `Directory.Build.props`, LICENSE (MIT), README khung | Repo public push lên GitHub |
 | 2 | Docker Compose: postgres + redis + minio. EF Core 10 + first migration. Setup `AddModules()/UseModules()` pattern | `docker compose up` lên được hạ tầng |
-| 3 | Module Identity — Domain (User, Role, RefreshToken) + DbContext | Migration Identity chạy |
+| 3 | Module Identity — `ApplicationUser`/`Role` (Infrastructure) + `RefreshToken` POCO (Domain) + DbContext | Migration Identity chạy |
 | 4 | JWT authentication + refresh token + role-based authorization. Login/Register endpoints | Đăng nhập trả JWT thật |
 | 5 | Global exception handling middleware, `Result<T>` pattern, FluentValidation cho Register | Lỗi trả về chuẩn ProblemDetails |
 | 6–7 | Module Events — CRUD đầy đủ, pagination, validation. Vài unit test domain | Events API chạy + test xanh |

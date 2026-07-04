@@ -1,4 +1,4 @@
-# Day 3 — Module Identity: Domain (User, Role, RefreshToken) + DbContext
+# Day 3 — Module Identity: ApplicationUser/Role (Infra) + RefreshToken POCO (Domain) + DbContext
 
 > **Mentor mode.** Tài liệu giải thích *vì sao* và *làm gì*, **không kèm code C#/cấu hình** — bạn tự gõ. Mọi lệnh CLI (`dotnet`, `docker`, `git`) thì cứ chạy theo. Mỗi file dưới đây là **một bước**, làm tuần tự từ trên xuống.
 >
@@ -8,7 +8,7 @@
 
 ## Mục tiêu Day 3
 
-Theo [ROADMAP](../../ROADMAP.md) (mục 5, Tuần 1 — Ngày 3): *Module Identity — Domain (User, Role, RefreshToken) + DbContext → Migration Identity chạy.*
+Theo [ROADMAP](../../ROADMAP.md) (mục 5, Tuần 1 — Ngày 3): *Module Identity — `ApplicationUser`/`Role` (Infrastructure) + `RefreshToken` POCO (Domain) + DbContext → Migration Identity chạy.*
 
 Kết thúc Day 3 bạn có: *module Identity đã **mô hình hóa** `User`, `Role`, `RefreshToken` thật (không còn DbContext rỗng như Day 2); `IdentityDbContext` sinh được **schema Identity đầy đủ** (7 bảng `AspNet*` + bảng `RefreshTokens`); migration mới áp được vào Postgres.*
 
@@ -55,6 +55,6 @@ Build phải xanh; migration mới phải liệt kê ra (và áp được vào D
 - [ ] `dotnet ef migrations add` sinh được migration có schema Identity thật; `dotnet ef database update` áp được.
 - [ ] Trong Postgres thấy đủ **7 bảng `AspNet*`** + bảng **`RefreshTokens`**.
 - [ ] `dotnet build EventHub.slnx` xanh, không warning (kể cả warning downgrade version EF Core).
-- [ ] **Bạn tự nói thành lời được:** vì sao dùng ASP.NET Core Identity thay vì domain thuần; 7 bảng `AspNet*` để làm gì; vì sao chọn kiểu khóa (Guid/`string`); đặt `ApplicationUser` ở Domain hay Infrastructure và đánh đổi ranh giới ra sao; `RefreshToken` quan hệ với User thế nào.
+- [ ] **Bạn tự nói thành lời được:** vì sao dùng ASP.NET Core Identity thay vì domain thuần; 7 bảng `AspNet*` để làm gì; vì sao chọn kiểu khóa (Guid/`string`); vì sao `ApplicationUser` ở **Infrastructure** còn `RefreshToken` ở **Domain**, và abstraction `IIdentityService` giải *cả hai* luật sạch (DDD + phân lớp) bằng Dependency Inversion ra sao; `RefreshToken` trỏ User bằng `UserId` (id-reference) thế nào.
 
 Xong Day 3, nhắn mentor **"review Day 3"** trước khi sang [Day 4](../README.md).

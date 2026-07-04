@@ -16,9 +16,9 @@ Auth là chỗ **dễ làm sai một cách nguy hiểm**. Nếu tự dựng bả
 
 ASP.NET Core Identity cho **sẵn tất cả** những thứ đó, đã được kiểm nghiệm ở quy mô lớn, kèm API `UserManager`/`RoleManager` để thao tác. Bạn tập trung vào phần *của bạn* (JWT, refresh rotation, phân quyền) thay vì phát minh lại phần hạ tầng auth.
 
-**Đánh đổi:** coupling — entity của bạn phải kế thừa type của framework (`IdentityUser`), kéo phụ thuộc package Identity. Đây chính là lý do có **Quyết định 2** ở dưới (đặt entity ở đâu, và coupling này "bẩn" tới đâu).
+**Đánh đổi:** coupling — entity của bạn phải kế thừa type của framework (`IdentityUser`), kéo phụ thuộc package Identity. Đây chính là lý do có **Quyết định 2** ở dưới (đặt entity ở đâu để coupling framework **không** rò xuống lõi domain).
 
-> Câu chốt khi phỏng vấn: *"Tôi không tự hash mật khẩu — auth là chỗ tự làm dễ tạo lỗ hổng. Tôi dùng ASP.NET Core Identity cho phần lưu trữ user/hashing/lockout đã kiểm nghiệm, và tự viết phần đặc thù (JWT + refresh token rotation). Coupling với framework tôi cân nhắc kỹ khi chọn nơi đặt entity (Quyết định 2)."*
+> Câu chốt khi phỏng vấn: *"Tôi không tự hash mật khẩu — auth là chỗ tự làm dễ tạo lỗ hổng. Tôi dùng ASP.NET Core Identity cho phần lưu trữ user/hashing/lockout đã kiểm nghiệm, và tự viết phần đặc thù (JWT + refresh token rotation). Coupling với framework tôi cô lập trong Infrastructure và cho Application dùng qua một abstraction (`IIdentityService`) — Domain giữ thuần POCO (Quyết định 2)."*
 
 ## A.3. ASP.NET Core Identity cho sẵn cái gì (7 bảng)
 
@@ -62,35 +62,51 @@ Mặc định `IdentityUser` dùng khóa chính kiểu `string` (một GUID lưu
 
 **Cạm bẫy quan trọng:** đổi kiểu khóa **phải làm ở migration ĐẦU TIÊN**. Đổi PK sau khi bảng đã tạo là rất khó (phải drop/tạo lại bảng — [xem "Change the primary key type"](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/customize-identity-model?view=aspnetcore-10.0#change-the-primary-key-type)). Vì Day 2 đã áp một migration rỗng `InitialCreate`, ta sẽ **dựng lại migration đó** (Hướng B ở [Bước 4](04-migration.md)) để `Guid` là kiểu khóa ngay từ đầu.
 
-### Quyết định 2 — Đặt `ApplicationUser`/`ApplicationRole`/`RefreshToken` ở **Domain** ✅
+### Quyết định 2 — `ApplicationUser`/`ApplicationRole` ở **Infrastructure**; `RefreshToken` (POCO) ở **Domain**; abstraction **`IIdentityService`** ở Application ✅
 
-`ApplicationUser` kế thừa `IdentityUser<Guid>`, `ApplicationRole` kế thừa `IdentityRole<Guid>`. Cả ba entity (User, Role, RefreshToken) đặt ở **`EventHub.Identity.Domain`** — khớp cả chữ [ROADMAP mục 5](../../ROADMAP.md) ("Module Identity — **Domain** (User, Role, RefreshToken)") lẫn chiều phân lớp.
+Đây là cách **các hệ thống lớn** (mẫu Clean Architecture của Jason Taylor, app tham chiếu **eShopOnWeb** của Microsoft) giải bài toán này. Cốt lõi: **Dependency Inversion** — đừng để lõi biết mặt framework, chỉ cho lõi biết một *hợp đồng* (interface) mà nó cần.
 
-**Mâu thuẫn cốt lõi — hai luật "sạch" đánh nhau:** đặt entity ở đâu thì project đó phải reference package chứa `IdentityUser`.
+**Mâu thuẫn cốt lõi — hai luật "sạch" đánh nhau:** đặt entity kế thừa `IdentityUser` ở đâu thì project đó phải reference package chứa `IdentityUser`.
 
 - **Luật DDD:** Domain nên thuần POCO, không dính framework.
 - **Luật phân lớp:** Application **không** được reference Infrastructure (chỉ Infrastructure → Application/Domain, không ngược).
 
-Không chỗ nào thỏa cả hai. Ở Day 4, handler Login/Register trong `Identity.Application` cần inject **`UserManager<ApplicationUser>`** → Application phải *nhìn thấy* type `ApplicationUser`. Nếu để `ApplicationUser` ở Infrastructure thì **Application phải reference Infrastructure** — đảo chiều phân lớp, mùi nặng. Đặt ở **Domain** thì Application → Domain, đúng chiều.
+Cái *bẫy* dẫn tới lời giải sai: "Ở Day 4, handler Login/Register cần inject `UserManager<ApplicationUser>` → Application phải *thấy* type `ApplicationUser` → nên nhét `ApplicationUser` xuống Domain cho Application với tới." Đây chính là giả định mà hệ thống lớn **từ chối**: Application **không** trực tiếp đụng `UserManager` hay `ApplicationUser` chút nào.
 
-**Vì sao coupling Doman chấp nhận được:** `IdentityUser<TKey>`/`IdentityRole<TKey>` nằm trong package **`Microsoft.Extensions.Identity.Stores`** — abstraction thuần, **không** kéo EF Core / DbContext / SQL. Nên "Domain reference Identity" ở đây chỉ là *abstraction user nhẹ*, không phải kéo database framework xuống lõi. Vi phạm Luật DDD **nhẹ**; đổi lại giữ được chiều phân lớp **đúng**.
+**Lời giải — chèn một abstraction (`IIdentityService`):**
 
-`RefreshToken` là POCO thuần (không kế thừa gì của Identity), cũng ở Domain, chỉ giữ `UserId: Guid`.
+- **Interface `IIdentityService`** → đặt ở **`EventHub.Identity.Application`**. Nó là *hợp đồng thuần*, surface toàn **primitive**: vào là `string`/`bool` (userName, password, userId, role…), ra là `Result` + `userId`. **Không** type Identity nào lọt ra ngoài interface. (Method thật khai ở **Day 4** khi viết handler; Day 3 chỉ cần hiểu quyết định này để đặt entity đúng chỗ.)
+- **Class hiện thực `IdentityService`** (giữ `UserManager<ApplicationUser>`) → đặt ở **`EventHub.Identity.Infrastructure`**. Đây là chỗ *duy nhất* chạm `UserManager`/`ApplicationUser`.
+- **`ApplicationUser`/`ApplicationRole`** (kế thừa `IdentityUser<Guid>`/`IdentityRole<Guid>`) → đặt ở **`EventHub.Identity.Infrastructure`** (auth là mối lo hạ tầng). **Không** leo lên Domain.
+- **`RefreshToken`** → POCO thuần ở **`EventHub.Identity.Domain`**, chỉ giữ **`UserId: Guid`** (id-reference), **không** navigation trỏ ngược `ApplicationUser` (điều đó sẽ là Domain → Infrastructure — cấm).
+
+**Vì sao lời giải này thắng *cả hai* luật (không phải đánh đổi):**
+
+| Luật | Nếu nhét `ApplicationUser` vào Domain (compromise) | Lời giải `IIdentityService` |
+|------|-----------------------------------------------------|------------------------------|
+| DDD — Domain thuần POCO | ❌ vi phạm — Domain kéo package Identity | ✅ Domain sạch trơn, **0** package Identity |
+| Phân lớp — App không ref Infra | ✅ giữ được | ✅ App chỉ dùng interface *nằm trong chính nó* |
+
+Cơ chế: Application **sở hữu** cái abstraction nó cần (`IIdentityService`); Infrastructure **implement** và chịu bẩn framework. Chiều tham chiếu vẫn **Infrastructure → Application → Domain**, đúng chuẩn, không đảo. Handler Day 4 inject `IIdentityService` — nó không hề biết `UserManager` tồn tại.
+
+**Cái giá phải trả (nói thẳng):** thêm một lớp adapter (interface + class impl); surface primitive nên mỗi nhu cầu Identity mới (đổi mật khẩu, gen token…) phải khai thêm một method trên interface; Domain trỏ user bằng `UserId` trần thay vì navigation hai chiều. Đổi lại: lõi domain **thuần tuyệt đối** và có thể test/thay Identity mà không đụng Application — đây đúng là thứ đáng "kể khi phỏng vấn" cho một CV piece về kiến trúc.
 
 ```text
-EventHub.Identity.Domain → ApplicationUser/ApplicationRole (: IdentityUser<Guid>)
-                           + RefreshToken (POCO: UserId: Guid)
-                           ref Microsoft.Extensions.Identity.Stores (abstraction, KHÔNG EF)
-EventHub.Identity.Infrastructure → IdentityDbContext (kế thừa base Identity EF)
-                                   + cấu hình quan hệ 1-n
+EventHub.Identity.Domain         → RefreshToken (POCO thuần: UserId: Guid) — KHÔNG package Identity
+EventHub.Identity.Application    → IIdentityService (interface, surface primitive)  [method: Day 4]
+EventHub.Identity.Infrastructure → ApplicationUser/ApplicationRole (: IdentityUser<Guid>)
+                                   + IdentityDbContext (kế thừa base Identity EF) + cấu hình 1-n
+                                   + IdentityService : IIdentityService (giữ UserManager) — Day 4
+                                   ref Microsoft.AspNetCore.Identity.EntityFrameworkCore
+Chiều ref: Infrastructure → Application → Domain   (đúng chuẩn, không đảo)
 ```
 
-> Câu chốt khi phỏng vấn: *"Đặt entity Identity ở đâu là trade-off giữa hai luật sạch: Domain thuần POCO vs Application không depend Infrastructure. Vì handler cần `UserManager<ApplicationUser>`, đặt ở Domain giữ chiều phân lớp đúng. Coupling Domain chỉ là `Microsoft.Extensions.Identity.Stores` — abstraction user, không kéo EF — nên vi phạm 'Domain thuần' rất nhẹ, chấp nhận được. Nếu sau này user cần hành vi domain giàu hơn, tôi sẽ tách `User` domain riêng khỏi `ApplicationUser` identity."*
+> Câu chốt khi phỏng vấn: *"Tôi coi ASP.NET Core Identity là hạ tầng: `ApplicationUser` và `UserManager` sống trong Infrastructure. Application chỉ phụ thuộc một abstraction `IIdentityService` mà chính nó định nghĩa (Dependency Inversion) — nên Domain thuần POCO tuyệt đối và Application không hề reference Infrastructure. Đây là pattern của Clean Architecture template (Jason Taylor) và eShopOnWeb. Domain trỏ user bằng `UserId` (id-reference qua ranh giới), không navigation hai chiều. Giá phải trả là một lớp adapter, nhưng đổi lại lõi domain tách được hoàn toàn khỏi framework auth."*
 
 ## A.6. Xong bước này khi
 
 - [ ] Bạn kể được 7 bảng `AspNet*` dùng làm gì và quan hệ giữa chúng.
 - [ ] Bạn phân biệt được `IdentityUserToken` (của Identity) vs `RefreshToken` (của bạn).
-- [ ] Bạn nói lại được **vì sao** chọn `Guid` và **vì sao** đặt entity ở Domain (mâu thuẫn hai luật sạch + `UserManager<ApplicationUser>` cần ở Application) — không chỉ "đã chốt vậy".
+- [ ] Bạn nói lại được **vì sao** chọn `Guid`, và **vì sao** `ApplicationUser` ở Infrastructure còn Domain chỉ giữ `RefreshToken` (POCO) — cơ chế `IIdentityService` giải *cả hai* luật sạch nhờ Dependency Inversion, chứ không đánh đổi — không chỉ "đã chốt vậy".
 
 → Sang [Bước 1 — Thêm package Identity EF](01-package.md).

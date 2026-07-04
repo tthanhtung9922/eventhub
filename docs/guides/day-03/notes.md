@@ -4,25 +4,28 @@
 
 ---
 
-## Ghi chú 1 — Ranh giới: vì sao entity Identity đặt ở Domain (không phải Infrastructure)?
+## Ghi chú 1 — Ranh giới: vì sao `ApplicationUser` ở Infrastructure còn `RefreshToken` ở Domain?
 
-**Hiểu sai thường gặp:** "`ApplicationUser` kế thừa framework Identity → phải nhét xuống Infrastructure để Domain thuần POCO."
+**Hiểu sai thường gặp (lối compromise):** "Handler Day 4 cần `UserManager<ApplicationUser>` → Application phải thấy `ApplicationUser` → nhét `ApplicationUser` xuống Domain cho Application với tới." Nghe hợp lý nhưng **sai** — nó vá layering bằng cách bẩn Domain.
 
-**Đúng cơ chế — hai luật "sạch" đánh nhau, phải chọn cái ít hại hơn:**
+**Đúng cơ chế — Dependency Inversion giải *cả hai* luật, không đánh đổi:**
 
 - **Luật DDD:** Domain nên thuần POCO, không dính framework.
 - **Luật phân lớp:** Application **không** được depend Infrastructure (chỉ Infra → App/Domain).
 
-Đặt `ApplicationUser` ở đâu thì hai luật này không thể thỏa cùng lúc. Điểm quyết định: Day 4, handler ở `Identity.Application` cần inject **`UserManager<ApplicationUser>`** → Application phải *thấy* type `ApplicationUser`.
+Điểm mấu chốt mà hệ thống lớn (Clean Architecture template của Jason Taylor, eShopOnWeb) chỉ ra: **Application không cần thấy `ApplicationUser` chút nào.** Chèn một abstraction:
 
-- Đặt ở **Infrastructure** → Application phải reference Infrastructure → **đảo chiều phân lớp** (hại nặng).
-- Đặt ở **Domain** → Application → Domain, đúng chiều. Domain có dính Identity, nhưng chỉ là **`Microsoft.Extensions.Identity.Stores`** — abstraction user, **không** kéo EF Core/DbContext. Vi phạm "Domain thuần" **rất nhẹ**.
+- Interface **`IIdentityService`** ở **Application** — surface toàn primitive (`string`/`bool`/`Result` + `userId`), không lộ type Identity.
+- Impl **`IdentityService`** (giữ `UserManager<ApplicationUser>`) ở **Infrastructure**.
+- **`ApplicationUser`/`ApplicationRole`** ở **Infrastructure** (auth = hạ tầng). **`RefreshToken`** ở **Domain** (khái niệm nghiệp vụ), chỉ giữ `UserId: Guid` — id-reference, không navigation ngược `ApplicationUser`.
 
-Cân hai cái: vi phạm nhẹ (Domain dính abstraction) < vi phạm nặng (App→Infra). Nên chọn **Domain**.
+Kết quả: Domain thuần POCO tuyệt đối (0 package Identity) **và** Application chỉ dùng interface nằm trong chính nó → không reference Infrastructure. Chiều ref: Infra → App → Domain, đúng chuẩn. Handler Day 4 inject `IIdentityService`, không hề biết `UserManager` tồn tại.
 
-- **Kiểm chứng:** `EventHub.Identity.Domain.csproj` chỉ được có `Microsoft.Extensions.Identity.Stores`, **không** có package EF Core hay `…Identity.EntityFrameworkCore`. `IdentityDbContext` phải ở Infrastructure, Domain không đụng tới.
+**Vì sao không phải trade-off nữa:** compromise (entity ở Domain) *chọn* vi phạm DDD để cứu layering. Lời giải `IIdentityService` **không hy sinh luật nào** — giá phải trả chỉ là một lớp adapter (interface + impl) và surface primitive (mỗi nhu cầu Identity mới → thêm một method). Đúng thứ đáng khoe cho CV kiến trúc.
 
-**Câu chốt khi phỏng vấn:** *"Nơi đặt entity Identity là trade-off giữa 'Domain thuần POCO' và 'Application không depend Infrastructure'. Vì handler cần `UserManager<ApplicationUser>`, tôi đặt ở Domain để giữ chiều phân lớp đúng; coupling chỉ là `Identity.Stores` (abstraction, không EF) nên vi phạm 'Domain thuần' rất nhẹ. Nếu user cần hành vi domain giàu hơn, tôi tách `User` domain riêng khỏi `ApplicationUser`."*
+- **Kiểm chứng:** `EventHub.Identity.Domain.csproj` **và** `EventHub.Identity.Application.csproj` **không** có package Identity/EF nào. `ApplicationUser`/`ApplicationRole`/`IdentityDbContext`/`IdentityService` đều ở Infrastructure. `RefreshToken` (Domain) chỉ có `UserId: Guid`, không navigation `ApplicationUser`.
+
+**Câu chốt khi phỏng vấn:** *"Tôi coi Identity là hạ tầng: `ApplicationUser`, `UserManager` ở Infrastructure. Application chỉ phụ thuộc abstraction `IIdentityService` mà chính nó định nghĩa (Dependency Inversion) — nên Domain thuần POCO tuyệt đối và Application không reference Infrastructure. Đây là pattern Clean Architecture / eShopOnWeb. Domain trỏ user bằng `UserId` (id-reference), không navigation hai chiều. Giá là một lớp adapter, đổi lại lõi tách hoàn toàn khỏi framework auth."*
 
 ---
 
