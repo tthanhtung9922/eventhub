@@ -71,10 +71,11 @@ Làm từ **mảnh phụ thuộc ít nhất** ra ngoài. **Build xanh xong một
 
 ### Mảnh 1 — record `RegisterOutcome` (Application)
 
-Kết quả đăng ký. Day 4 chưa có `Result<T>` nên gói `(thành công?, userId, danh sách lỗi)` vào một record.
+Kết quả đăng ký. Day 4 chưa có `Result<T>` nên gói `(thành công?, userId, lý do lỗi, danh sách lỗi)` vào một record.
 
-- Chữ ký: `record RegisterOutcome(bool Succeeded, Guid? UserId, string[] Errors)`.
+- Chữ ký: `record RegisterOutcome(bool Succeeded, Guid? UserId, RegisterFailureReason Reason, string[] Errors)`. Khi fail, `UserId` phải là `null` (không phải `Guid.Empty` — `Guid?` mà trả guid toàn-0 thì caller check `is null` hiểu sai).
 - File: `RegisterOutcome.cs` đặt ở `src/Modules/Identity/EventHub.Identity.Application/Authentication/`, **cạnh interface** — không để ở `DTO/`, vì đây là kết quả nội bộ của thao tác auth, không phải request/response HTTP. Nó **không** phải `IdentityResult` (`IdentityResult` là type Infra, không được lộ lên Application).
+- Kèm enum `RegisterFailureReason { None, DuplicateEmail, WeakPassword, Unknown }` (cùng thư mục Application) để endpoint chọn HTTP status theo *loại* lỗi thay vì gộp hết một mã. Vì sao cần: `string[] Errors` chỉ là mô tả, mất thông tin phân loại; enum cho endpoint map `DuplicateEmail → 409`, `WeakPassword → 400`. Ai điền enum: xem Mảnh 3.
 
 ### Mảnh 2 — mở rộng `IIdentityService` (Application)
 
@@ -89,7 +90,8 @@ Interface đang rỗng. Thêm 4 method, **chữ ký toàn primitive/record của
 
 `IdentityService : IIdentityService`, file `IdentityService.cs` ở `src/Modules/Identity/EventHub.Identity.Infrastructure/Authentication/` (cạnh `JwtTokenGenerator`). Inject qua primary constructor: `UserManager<ApplicationUser>`, `IdentityModuleDbContext`, `TimeProvider`.
 
-- **`RegisterUserAsync`**: dựng `ApplicationUser` với `Email` + `UserName` (đặt `UserName = email` cho đơn giản; Identity đòi có `UserName`). Gọi `userManager.CreateAsync(user, password)`. Thành công → `new RegisterOutcome(true, user.Id, [])`. Thất bại → `new RegisterOutcome(false, null, result.Errors.Select(e => e.Description).ToArray())`. `IdentityResult` chỉ xuất hiện nội bộ Infra, không leak ra interface.
+- **`RegisterUserAsync`**: dựng `ApplicationUser` với `Email` + `UserName` (đặt `UserName = email` cho đơn giản; Identity đòi có `UserName`). Gọi `userManager.CreateAsync(user, password)`. Thành công → `new RegisterOutcome(true, user.Id, RegisterFailureReason.None, [])`. Thất bại → `new RegisterOutcome(false, null, <reason>, result.Errors.Select(e => e.Description).ToArray())`. `IdentityResult` chỉ xuất hiện nội bộ Infra, không leak ra interface.
+- **Suy `Reason` từ `IdentityResult` — làm ở Infra, không leak:** `IdentityResult.Errors` là các `IdentityError` có `Code` (string) + `Description`. **Không có enum** cho code — `Code` chính là `nameof` method của `IdentityErrorDescriber`, nên so `e.Code == nameof(IdentityErrorDescriber.DuplicateEmail)` là cách chính chủ (dùng `nameof` làm source of truth thay literal `"DuplicateEmail"`; so `==`/`Array.Contains` ordinal, **không** `string.Contains`). Gom về một extension `internal static RegisterFailureReason ToRegisterFailureReason(this IdentityResult result)`: có code `DuplicateEmail`/`DuplicateUserName` → `DuplicateEmail`; có code nhóm `Password*` (`PasswordTooShort`, `PasswordRequiresDigit`, `PasswordRequiresUpper`, `PasswordRequiresLower`, `PasswordRequiresNonAlphanumeric`, `PasswordRequiresUniqueChars`) → `WeakPassword`; còn lại → `Unknown`. Đặt extension ở Infra (nơi `IdentityResult` sống); Application chỉ nhận enum, không hề thấy `IdentityError`.
 - **`VerifyPasswordAsync`**: `userManager.FindByEmailAsync(email)`; null → trả `null`. Có user → `userManager.CheckPasswordAsync(user, password)` (không tự so hash, nó lo PBKDF2 + salt); đúng thì trả `user.Id`.
 - **`GetRolesAsync`**: `userManager.FindByIdAsync(userId.ToString())` — **chú ý** `FindByIdAsync` nhận `string`, phải `.ToString()`. Rồi `userManager.GetRolesAsync(user)` trả `IList<string>`; `.ToList()` để khớp `IReadOnlyList<string>`.
 - **`CreateRefreshTokenAsync`** (phần cryptographic, làm cẩn thận):
@@ -121,7 +123,9 @@ Trong `DependencyInjection.AddInfrastructure`: `services.AddScoped<IIdentityServ
 
 Hiện chỉ có `/identity/ping`. Thêm hai route, mỏng:
 
-- `POST /identity/register`: tham số `(RegisterRequest req, AuthService svc)` — minimal API tự bind body + inject service. Gọi `RegisterAsync`. Ok → `Results.Ok()`/`Results.Created(...)`; trùng email / mật khẩu yếu → `Results.Conflict(...)` / `Results.ValidationProblem(...)` kèm mảng lỗi.
+- `POST /identity/register`: tham số `(RegisterRequest req, AuthService svc)` — minimal API tự bind body + inject service. Gọi `RegisterAsync`. Guard success trước: `outcome.Succeeded` → `Results.Ok()`/`Results.Created(...)`. Fail thì **switch expression** trên `outcome.Reason`: `DuplicateEmail → Results.Conflict(outcome.Errors)` (409), `WeakPassword → Results.ValidationProblem(...)` (400), `_ → Results.Problem()`.
+  - **Bẫy `Results.ValidationProblem`:** chữ ký nhận `IDictionary<string, string[]>`, **không** nhận `string[]` — bọc `outcome.Errors` vào một dictionary một entry (vd key `"password"`) trước khi truyền.
+  - **Bẫy switch expression:** nhánh discard `_ =>` phải để **cuối**; đặt đầu thì mọi nhánh sau unreachable (compiler cảnh báo "pattern is unreachable").
 - `POST /identity/login`: thêm tham số `HttpContext` để lấy IP (`ctx.Connection.RemoteIpAddress?.ToString()`). Gọi `LoginAsync`. Đúng → `Results.Ok(authResult)`; sai → `Results.Unauthorized()`.
 
 **Naming — vì sao interface method là `RegisterUserAsync` còn `AuthService` là `RegisterAsync`:** hai type khác nhau nên tên có thể trùng mà không đụng compiler, nhưng đặt khác nhau (`RegisterUserAsync` cho tầng Identity, `RegisterAsync` cho tầng orchestration) để đọc code không lẫn "đang ở tầng nào".
@@ -193,11 +197,11 @@ Nếu chỉ nhớ ba thứ:
 
 ## 3.13. Xong bước này khi
 
-- [ ] `RegisterOutcome` (Application/Authentication/) + `IIdentityService` mở rộng đủ 4 method; impl `IdentityService` ở Infrastructure cầm `UserManager` + `DbContext` + `TimeProvider`.
-- [ ] `AuthService` (Application) ghép `IIdentityService` + `IJwtTokenGenerator`, trả `AuthResult`; **không** thấy `UserManager`/`JwtOptions`.
-- [ ] `POST /identity/register` tạo user; trùng email → lỗi rõ ràng.
-- [ ] `POST /identity/login` đúng → access + refresh token; sai → 401 thông báo mơ hồ.
-- [ ] Access token verify được ở jwt.io; `RefreshTokens` lưu **hash**.
-- [ ] `dotnet build` xanh.
+- [x] `RegisterOutcome` (Application/Authentication/) + `IIdentityService` mở rộng đủ 4 method; impl `IdentityService` ở Infrastructure cầm `UserManager` + `DbContext` + `TimeProvider`.
+- [x] `AuthService` (Application) ghép `IIdentityService` + `IJwtTokenGenerator`, trả `AuthResult`; **không** thấy `UserManager`/`JwtOptions`.
+- [x] `POST /identity/register` tạo user; trùng email → lỗi rõ ràng.
+- [x] `POST /identity/login` đúng → access + refresh token; sai → 401 thông báo mơ hồ.
+- [x] Access token verify được ở jwt.io; `RefreshTokens` lưu **hash**.
+- [x] `dotnet build` xanh.
 
 → Sang [Bước 4. Refresh (rotation) & thu hồi token](04-refresh-revoke.md).
