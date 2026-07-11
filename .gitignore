@@ -490,3 +490,6 @@ CLAUDE.md
 
 # Temp
 temp/
+
+# Guides = tài liệu học tập local-only, không track (mỗi máy giữ bản riêng)
+docs/guides/
