@@ -11,7 +11,7 @@ public static class IdentitySeeder
     public static async Task SeedAsync(
         RoleManager<ApplicationRole> roleManager,
         UserManager<ApplicationUser> userManager,
-        IdentitySeedOptions options)
+        IOptions<IdentitySeedOptions> optionsAccessor)
     {
         IReadOnlyList<string> roles = ["Admin", "User"];
 
@@ -28,11 +28,11 @@ public static class IdentitySeeder
         }
 
         // Optional Tạo admin mặc định
-        if (options.IsSeedAdmin)
+        if (optionsAccessor.Value.IsSeedAdmin)
         {
-            var adminUserName = options.AdminUserName ?? throw new InvalidOperationException($"AdminUserName is not configured");
-            var adminEmail = options.AdminEmail ?? throw new InvalidOperationException($"AdminEmail is not configured");
-            var adminPassword = options.AdminPassword ?? throw new InvalidOperationException($"AdminPassword is not configured");
+            var adminUserName = optionsAccessor.Value.AdminUserName ?? throw new InvalidOperationException($"AdminUserName is not configured");
+            var adminEmail = optionsAccessor.Value.AdminEmail ?? throw new InvalidOperationException($"AdminEmail is not configured");
+            var adminPassword = optionsAccessor.Value.AdminPassword ?? throw new InvalidOperationException($"AdminPassword is not configured");
 
             var admin = new ApplicationUser
             {
@@ -47,6 +47,9 @@ public static class IdentitySeeder
             {
                 var createAdminResult = await userManager.CreateAsync(admin, adminPassword);
                 createAdminResult.EnsureSucceeded("admin");
+
+                var setLockoutAdminResult = await userManager.SetLockoutEnabledAsync(admin, true);
+                setLockoutAdminResult.EnsureSucceeded("admin");
 
                 var addRoleToAdminResult = await userManager.AddToRoleAsync(admin, "Admin");
                 addRoleToAdminResult.EnsureSucceeded("admin");

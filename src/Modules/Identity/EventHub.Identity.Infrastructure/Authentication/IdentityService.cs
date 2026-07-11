@@ -9,19 +9,20 @@ using EventHub.Identity.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace EventHub.Identity.Infrastructure.Authentication;
 
 public class IdentityService(
     UserManager<ApplicationUser> userManager,
-    JwtOptions jwtOptions,
+    SignInManager<ApplicationUser> signInManager,
+    IPasswordHasher<ApplicationUser> passwordHasher,
+    IOptions<JwtOptions> jwtOptionsAccessor,
     IdentityModuleDbContext dbContext,
-    TimeProvider timeProvider) : IIdentityService
+    TimeProvider timeProvider)
+    : IIdentityService
 {
-    private readonly UserManager<ApplicationUser> _userManager = userManager;
-    private readonly JwtOptions _jwtOptions = jwtOptions;
-    private readonly IdentityModuleDbContext _dbContext = dbContext;
-    private readonly TimeProvider _timeProvider = timeProvider;
+    private static readonly string DummyHash = "AQAAAAIAAYagAAAAEJAFDF7PnQz36J3E45gvYddZHEHizqhHjuOgbu7K/4hVjNNdeMySLWn8JlT+P5v5Ew==";
 
     public async Task<RegisterOutcome> RegisterUserAsync(string email, string password)
     {
@@ -31,7 +32,7 @@ public class IdentityService(
             Email = email
         };
 
-        var result = await _userManager.CreateAsync(user, password);
+        var result = await userManager.CreateAsync(user, password);
         var failureReason = result.ToRegisterFailureReason();
 
         return result.Succeeded
@@ -41,32 +42,36 @@ public class IdentityService(
 
     public async Task<Guid?> VerifyPasswordAsync(string email, string password)
     {
-        var user = await _userManager.FindByEmailAsync(email);
-        if (user == null) return null;
+        var user = await userManager.FindByEmailAsync(email);
+        if (user == null)
+        {
+            _ = passwordHasher.VerifyHashedPassword(new ApplicationUser(), DummyHash, password);
+            return null;
+        }
 
-        var isValid = await _userManager.CheckPasswordAsync(user, password);
-        return isValid ? user.Id : null;
+        var checkResult = await signInManager.CheckPasswordSignInAsync(user, password, lockoutOnFailure: true);
+        return checkResult.Succeeded ? user.Id : null;
     }
 
     public async Task<string> CreateRefreshTokenAsync(Guid userId, string ip, CancellationToken cancellationToken)
     {
-        var now = _timeProvider.GetUtcNow();
+        var now = timeProvider.GetUtcNow();
 
-        var (newToken, newRefreshToken) = await GenerateRefreshToken(userId, ip, now);
+        var (newToken, newRefreshToken) = GenerateRefreshToken(userId, ip, now);
 
-        _dbContext.RefreshTokens.Add(newRefreshToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.RefreshTokens.Add(newRefreshToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return newToken;
     }
 
     public async Task<RotatedRefreshToken?> RotateRefreshTokenAsync(string rawRefreshToken, string ip, CancellationToken cancellationToken)
     {
-        var now = _timeProvider.GetUtcNow();
+        var now = timeProvider.GetUtcNow();
 
         var rawTokenHash = Convert.ToBase64String(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(rawRefreshToken)));
 
-        var dataToken = await _dbContext.RefreshTokens.FirstOrDefaultAsync(x => x.TokenHash == rawTokenHash, cancellationToken: cancellationToken);
+        var dataToken = await dbContext.RefreshTokens.FirstOrDefaultAsync(x => x.TokenHash == rawTokenHash, cancellationToken: cancellationToken);
 
         // Kiểm tra xem có tồn tại rawTokenHash dưới DB không
         if (dataToken == null) return null;
@@ -74,63 +79,70 @@ public class IdentityService(
         // Kiểm tra xem rawTokenHash đã revoke lần nào chưa
         if (dataToken.RevokedAt != null)
         {
-            await _dbContext.RefreshTokens
-                .Where(x => x.UserId == dataToken.UserId && x.RevokedAt == null)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(y => y.RevokedAt, now), cancellationToken: cancellationToken);
-
+            await RevokeAll(dataToken.UserId, now, cancellationToken);
             return null;
         }
 
         // Kiểm tra xem rawTokenHash đã hết hạn chưa
         if (dataToken.ExpiresAt <= now) return null;
 
-        var (newToken, newRefreshToken) = await GenerateRefreshToken(dataToken.UserId, ip, now);
+        var (newToken, newRefreshToken) = GenerateRefreshToken(dataToken.UserId, ip, now);
 
-        // Sửa cũ
-        dataToken.RevokedAt = now;
-        dataToken.ReplacedByTokenHash = newRefreshToken.TokenHash;
+        // Sửa cũ - Conditional update atomic
+        var rowAffected = await dbContext.RefreshTokens
+            .Where(x => x.Id == dataToken.Id && x.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(y => y.RevokedAt, now)
+                .SetProperty(y => y.ReplacedByTokenHash, newRefreshToken.TokenHash)
+            , cancellationToken);
+
+        // Check xem có request khác vừa rotate token này trước không?
+        if (rowAffected == 0)
+        {
+            await RevokeAll(dataToken.UserId, now, cancellationToken);
+            return null;
+        }
 
         // Thêm mới
-        _dbContext.RefreshTokens.Add(newRefreshToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.RefreshTokens.Add(newRefreshToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return new RotatedRefreshToken(dataToken.UserId, newToken);
     }
 
     public async Task RevokeRefreshTokenAsync(string rawRefreshToken, CancellationToken cancellationToken)
     {
-        var now = _timeProvider.GetUtcNow();
+        var now = timeProvider.GetUtcNow();
 
         var rawTokenHash = Convert.ToBase64String(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(rawRefreshToken)));
 
-        var dataToken = await _dbContext.RefreshTokens.FirstOrDefaultAsync(x => x.TokenHash == rawTokenHash, cancellationToken: cancellationToken);
+        var dataToken = await dbContext.RefreshTokens.FirstOrDefaultAsync(x => x.TokenHash == rawTokenHash, cancellationToken: cancellationToken);
 
         if (dataToken != null && dataToken.RevokedAt == null)
         {
             dataToken.RevokedAt = now;
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
     }
 
     public async Task<IReadOnlyList<string>> GetRolesAsync(Guid userId)
     {
-        var user = await _userManager.FindByIdAsync(userId.ToString());
+        var user = await userManager.FindByIdAsync(userId.ToString());
         if (user == null) return [];
 
-        var roles = await _userManager.GetRolesAsync(user);
+        var roles = await userManager.GetRolesAsync(user);
         return roles == null ? [] : roles.ToList();
     }
 
     public async Task<string?> GetEmailAsync(Guid userId)
     {
-        var user = await _userManager.FindByIdAsync(userId.ToString());
+        var user = await userManager.FindByIdAsync(userId.ToString());
         return user?.Email;
     }
 
     #region Private Method
 
-    private async Task<(string newToken, RefreshToken newRefreshToken)> GenerateRefreshToken(Guid userId, string ip, DateTimeOffset time)
+    private (string newToken, RefreshToken newRefreshToken) GenerateRefreshToken(Guid userId, string ip, DateTimeOffset time)
     {
         var randomBytes = RandomNumberGenerator.GetBytes(64);
         var newToken = WebEncoders.Base64UrlEncode(randomBytes);
@@ -141,12 +153,21 @@ public class IdentityService(
             Id = Guid.NewGuid(),
             UserId = userId,
             TokenHash = newTokenHash,
-            ExpiresAt = time.AddDays(_jwtOptions.RefreshTokenLifetimeDays),
+            ExpiresAt = time.AddDays(jwtOptionsAccessor.Value.RefreshTokenLifetimeDays),
             CreatedAt = time,
             CreatedByIp = ip
         };
 
         return (newToken, newRefreshToken);
+    }
+
+    private async Task RevokeAll(Guid userId, DateTimeOffset revokedAt, CancellationToken cancellationToken)
+    {
+        await dbContext.RefreshTokens
+            .Where(x => x.UserId == userId && x.RevokedAt == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(y => y.RevokedAt, revokedAt)
+            , cancellationToken);
     }
 
     #endregion

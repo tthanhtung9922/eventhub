@@ -10,7 +10,6 @@ namespace EventHub.Identity.Api;
 
 public sealed class IdentityModule : IModule
 {
-
     public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddInfrastructure(configuration);

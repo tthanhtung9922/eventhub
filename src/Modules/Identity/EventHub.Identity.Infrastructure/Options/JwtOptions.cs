@@ -13,5 +13,5 @@ public class JwtOptions
     /// Current stored in dotnet user-secrets for development.
     /// User-secrets key: "Jwt:SigningKey"
     /// </summary>
-    public string? SigningKey { get; set; }
+    public required string SigningKey { get; set; }
 }
