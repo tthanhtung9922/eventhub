@@ -37,6 +37,7 @@ Quỹ thời gian: đây là ngày **nặng nhất Tuần 1** (nhiều mảnh gh
 | 4 | [04-refresh-revoke.md](04-refresh-revoke.md) | Endpoint refresh: rotation + reuse detection; endpoint logout thu hồi token |
 | 5 | [05-authorization.md](05-authorization.md) | Seed role, gắn role claim vào JWT, endpoint chỉ Admin, phân biệt 401 vs 403 |
 | 6 | [06-verify-commit.md](06-verify-commit.md) | Verify e2e qua HTTP → commit → push |
+| 7 | [07-hardening-bao-mat.md](07-hardening-bao-mat.md) | **(Bổ sung, sau review)** Vá 9 phát hiện security review: lockout, timing enumeration, ClockSkew, validate signing key, rotation atomic, pin thuật toán, trade-off cookie/enumeration |
 
 ## Quy tắc kiểm chứng xuyên suốt
 
