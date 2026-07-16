@@ -1,6 +1,6 @@
-# EventHub
+# Finno
 
-> Nền tảng đặt vé sự kiện xây dựng theo kiến trúc **Modular Monolith** trên **.NET 10**. Mục tiêu: mỗi kỹ thuật backend cốt lõi (Authentication, Realtime, Caching, CDN, Messaging, Concurrency) có một lát cắt chạy thật, tối giản nhưng làm đúng cách.
+> Backend quản lý tài chính chung cho gia đình theo mô hình **envelope budgeting**, dựng theo kiến trúc **Modular Monolith** trên **.NET 10**. Mục tiêu: mỗi kỹ thuật backend cốt lõi (Authentication, Realtime, Caching, CDN, Messaging, Concurrency) có một lát cắt chạy thật, tối giản nhưng làm đúng cách.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
@@ -9,7 +9,7 @@
 
 ## Mục lục
 
-- [EventHub](#eventhub)
+- [Finno](#finno)
   - [Mục lục](#mục-lục)
   - [Tổng quan](#tổng-quan)
   - [Trạng thái hiện tại](#trạng-thái-hiện-tại)
@@ -29,65 +29,72 @@
 
 ## Tổng quan
 
-EventHub cho phép Organizer tạo sự kiện và bán vé, Attendee đặt vé theo thời gian thực. Project được thiết kế như một **bài trình diễn kỹ thuật**: thay vì nhiều tính năng, mỗi khái niệm backend quan trọng có một lát cắt chạy thật và được giải thích lý do thiết kế.
+Finno để một gia đình quản lý tiền chung theo lối envelope budgeting: chia thu nhập vào các "phong bì" ngân sách (envelope) theo từng nhóm chi như ăn uống, điện nước, học phí, rồi mỗi giao dịch trừ dần vào phong bì tương ứng. Nhiều thành viên trong một hộ (Household) cùng xem và cùng chi trên một bộ ngân sách, phân vai Owner / Member / Viewer.
 
-Điểm nhấn kỹ thuật dự kiến là bài toán **chống overselling** (nhiều người mua vé cuối cùng cùng lúc), giải bằng optimistic concurrency kết hợp transactional outbox. Phần này **chưa xây**, xem [Lộ trình](#lộ-trình).
+Repo được dựng như một bài trình diễn kỹ thuật hơn là một sản phẩm đủ tính năng. Thay vì gom nhiều màn hình, mỗi khái niệm backend quan trọng có một lát cắt chạy thật và có lý do thiết kế ghi lại được.
+
+Bài toán khó nằm ở chỗ **nhiều người cùng chi một phong bì gần cạn cùng lúc**: hai giao dịch đồng thời không được phép đẩy số dư âm quá mức. Đây là bài toán tranh chấp thật, giải bằng optimistic concurrency (rowversion) trên số dư envelope, cộng transactional outbox để ghi giao dịch và phát sự kiện là một khối atomic. Phần này chưa xây, xem [Lộ trình](#lộ-trình).
+
+Domain trước đây của repo là bán vé sự kiện; lý do đổi sang tài chính gia đình ghi trong [ADR-0006](docs/adr/0006-pivot-sang-tai-chinh-gia-dinh.md).
 
 ---
 
 ## Trạng thái hiện tại
 
-Đây là project cá nhân đang xây dở, không phải hệ thống production. README này phân biệt rõ **cái đã chạy** và **cái mới nằm trong kế hoạch**, để ai đọc repo không phải đoán.
+Đây là project cá nhân đang xây dở, không phải hệ thống production. README này tách rõ **cái đã chạy** và **cái còn nằm trong kế hoạch**, để ai đọc repo không phải đoán.
 
-**Đã xây (chạy được, có thể đọc code):**
+**Đã xây (chạy được, đọc được code):**
 
-- Bộ khung Modular Monolith: host `EventHub.Api` làm composition root, `IModule` để module tự đăng ký, DbContext tách riêng theo module.
-- Module **Identity** đầy đủ 4 tầng (Domain / Application / Infrastructure / Api):
+- Bộ khung Modular Monolith: host `Finno.Api` làm composition root, `IModule` để module tự đăng ký, DbContext tách riêng theo module.
+- Module **Identity** đủ 4 tầng (Domain / Application / Infrastructure / Api):
   - Đăng ký, đăng nhập, JWT access token.
   - Refresh token rotation, phát hiện tái sử dụng token đã thu hồi thì revoke toàn bộ chain của user. Token sinh bằng RNG, lưu SHA-256 hash, unique index trên `TokenHash`.
   - Seed role Admin/User và admin mặc định qua `IHostedService`, credential đọc từ config.
   - Endpoint: `/identity/register`, `/login`, `/refresh`, `/logout`, `/me`, `/admin-only`.
   - Đã qua một vòng security review và vá 9 lỗ hổng (lockout, cân timing khi login, rotation atomic bằng `ExecuteUpdateAsync`, `ClockSkew = 0`, pin thuật toán HS256).
-- `Result<T>` / `Error` / `ErrorType` ở SharedKernel, `GlobalExceptionHandler` trả ProblemDetails không lộ stack trace, `ValidationFilter<T>` + FluentValidation chặn input rác ở endpoint.
+- `Result<T>` / `Error` / `ErrorType` ở SharedKernel, `GlobalExceptionHandler` trả ProblemDetails không lộ stack trace, `ValidationFilter<T>` + FluentValidation chặn input rác ngay ở endpoint.
 - Docker Compose cho hạ tầng phụ thuộc: PostgreSQL 17, Redis 8, MinIO.
-- 5 ADR ghi lại các quyết định lớn.
+- 6 ADR ghi lại các quyết định lớn.
 
 **Chưa xây:**
 
-Module Events, module Ticketing, Wolverine, SignalR, HybridCache (Redis mới chỉ có container, chưa có code dùng), tích hợp MinIO, chống overselling, OpenAPI/Scalar, Serilog, OpenTelemetry, test (unit / integration / architecture), Dockerfile cho API, CI trên GitHub Actions.
+Module Budgeting (Household / Account / Category / Envelope), module Ledger (Transaction), Wolverine, SignalR, HybridCache (Redis mới có container, chưa có code dùng), tích hợp MinIO, chống chi vượt envelope, import CSV sao kê idempotent, OpenAPI/Scalar, Serilog, OpenTelemetry, test (unit / integration / architecture), Dockerfile cho API, CI trên GitHub Actions.
 
 ---
 
 ## Kỹ thuật được trình diễn
 
-| Kỹ thuật                 | Module        | Cách triển khai                                                   | Trạng thái |
-| ------------------------ | ------------- | ----------------------------------------------------------------- | ---------- |
-| **Authentication**       | Identity      | JWT + refresh token rotation, phân quyền theo role                | Xong       |
-| **Xử lý lỗi**            | Toàn hệ thống | `Result<T>` + ProblemDetails + FluentValidation                   | Xong       |
-| **CRUD + Database**      | Events        | EF Core 10, pagination, validation                                | Kế hoạch   |
-| **Caching**              | Events        | HybridCache (L1 in-memory + L2 Redis), cache-aside + invalidation | Kế hoạch   |
-| **CDN / Object Storage** | Events        | Upload poster lên MinIO (S3-compatible)                           | Kế hoạch   |
-| **Realtime**             | Ticketing     | SignalR: cập nhật số vé còn lại trực tiếp                         | Kế hoạch   |
-| **Messaging / Queue**    | Ticketing     | Wolverine: đặt vé bất đồng bộ + transactional outbox              | Kế hoạch   |
-| **Concurrency**          | Ticketing     | Optimistic concurrency (rowversion) chống overselling             | Kế hoạch   |
-| **Observability**        | Toàn hệ thống | Serilog structured logging + OpenTelemetry tracing                | Kế hoạch   |
-| **DevOps**               | Toàn hệ thống | Docker multi-stage, Compose, GitHub Actions CI                    | Kế hoạch   |
+| Kỹ thuật                 | Module        | Cách triển khai                                                        | Trạng thái |
+| ------------------------ | ------------- | --------------------------------------------------------------------- | ---------- |
+| **Authentication**       | Identity      | JWT + refresh token rotation, phân quyền theo role                    | Xong       |
+| **Xử lý lỗi**            | Toàn hệ thống | `Result<T>` + ProblemDetails + FluentValidation                       | Xong       |
+| **CRUD + Database**      | Budgeting     | EF Core 10: Household / Account / Category / Envelope, pagination, validation | Kế hoạch   |
+| **Caching**              | Budgeting     | HybridCache (L1 in-memory + L2 Redis), cache-aside số dư/report + invalidation | Kế hoạch   |
+| **CDN / Object Storage** | Budgeting     | Upload ảnh hóa đơn lên MinIO (S3-compatible)                          | Kế hoạch   |
+| **Realtime**             | Ledger        | SignalR: đẩy số dư envelope mới cho mọi thành viên trong hộ           | Kế hoạch   |
+| **Messaging / Queue**    | Ledger        | Wolverine: ghi giao dịch bất đồng bộ + transactional outbox + recurring | Kế hoạch   |
+| **Concurrency**          | Ledger        | Optimistic concurrency (rowversion) chống chi vượt envelope           | Kế hoạch   |
+| **Idempotency**          | Ledger        | Import CSV sao kê, khử trùng lặp theo hash giao dịch                  | Kế hoạch   |
+| **Observability**        | Toàn hệ thống | Serilog structured logging + OpenTelemetry tracing                    | Kế hoạch   |
+| **DevOps**               | Toàn hệ thống | Docker multi-stage, Compose, GitHub Actions CI                        | Kế hoạch   |
 
 ---
 
 ## Kiến trúc
 
-EventHub là một **Modular Monolith**: một process duy nhất, mã nguồn chia thành các module độc lập. Mỗi module tự chứa Domain, Application, Infrastructure và API endpoints; các module giao tiếp với nhau **chỉ qua integration events** hoặc public contracts, không reference trực tiếp nội bộ của nhau.
+Finno là một **Modular Monolith**: một process duy nhất, mã nguồn chia thành các module độc lập. Mỗi module tự chứa Domain, Application, Infrastructure và API endpoints; các module giao tiếp với nhau **chỉ qua integration events** hoặc public contracts, không reference trực tiếp nội bộ của nhau.
 
-Hiện mới có module **Identity**. Events và Ticketing nằm trong sơ đồ dưới đây là phần dự kiến, chưa có code.
+Hiện mới có module **Identity**. Budgeting và Ledger trong sơ đồ dưới là phần dự kiến, chưa có code. Household là aggregate gốc để chia sẻ: nó sở hữu Account, Category, Envelope và Transaction, và cũng là ranh giới phân quyền (một user chỉ chạm dữ liệu của hộ mình).
 
 ```text
 ┌─────────────────────────────────────────────┐
-│            EventHub.Api (Host)               │
-│           Composition Root                   │
+│              Finno.Api (Host)                │
+│             Composition Root                 │
 ├───────────┬───────────────┬─────────────────┤
-│  Identity │     Events     │   Ticketing     │
+│  Identity │   Budgeting    │     Ledger      │
 │  (xong)   │  (kế hoạch)    │   (kế hoạch)    │
+│           │ Household/      │ Transaction     │
+│           │ Account/Envelope│ (outbox+realtime)│
 └───────────┴───────────────┴─────────────────┘
         │            │              │
         └──── message bus (kế hoạch) ┘
@@ -98,7 +105,7 @@ PostgreSQL   Redis           MinIO     SignalR
  (đang dùng) (kế hoạch)   (kế hoạch)  (kế hoạch)
 ```
 
-Ranh giới module dự kiến sẽ được ép tự động bằng architecture test (NetArchTest) chạy trong CI. Cả hai phần này chưa làm.
+Ranh giới module dự kiến được ép tự động bằng architecture test (NetArchTest) chạy trong CI. Cả hai phần này chưa làm.
 
 Lý do lựa chọn xem trong các [ADR](docs/adr/).
 
@@ -121,6 +128,8 @@ Dự kiến thêm theo lộ trình: Wolverine, HybridCache + Redis, SignalR, Min
 
 > **Lưu ý về license:** project chủ động tránh các thư viện đã chuyển sang license thương mại từ 2025 (MediatR, AutoMapper, MassTransit, Moq, FluentAssertions) và chọn thay thế tương đương. Lý do chi tiết trong [ADR-0003](docs/adr/0003-tranh-thu-vien-thuong-mai.md).
 
+> **Tiền tệ:** số tiền lưu bằng `decimal` theo đơn vị nhỏ nhất và cẩn thận khi làm tròn. Auto-import từ ngân hàng Việt Nam chưa khả thi vì thiếu open-banking phổ biến, nên nguồn nhập là upload CSV / sao kê hoặc nhập tay.
+
 ---
 
 ## Bắt đầu nhanh
@@ -136,8 +145,8 @@ API chưa được đóng gói vào Docker, nên compose chỉ dựng hạ tần
 
 ```bash
 # Clone repo
-git clone https://github.com/tthanhtung9922/eventhub.git
-cd eventhub
+git clone https://github.com/tthanhtung92/finno.git
+cd finno
 
 # Tạo .env ở gốc từ mẫu
 cp .env.example .env
@@ -146,7 +155,7 @@ cp .env.example .env
 docker compose -f docker/docker-compose.yml --env-file .env up -d
 
 # Chạy API từ source
-dotnet run --project src/Bootstrap/EventHub.Api
+dotnet run --project src/Bootstrap/Finno.Api
 
 # MinIO console: http://localhost:9001
 ```
@@ -158,24 +167,26 @@ Muốn kèm pgAdmin thì dùng `docker/docker-compose.local.yml`.
 ## Cấu trúc dự án
 
 ```text
-EventHub/
+finno/
 ├── src/
-│   ├── Bootstrap/EventHub.Api/      # Host duy nhất, composition root
+│   ├── Bootstrap/Finno.Api/        # Host duy nhất, composition root
 │   ├── Modules/
-│   │   └── Identity/                # Auth, JWT, refresh token rotation
-│   │       ├── EventHub.Identity.Domain/
-│   │       ├── EventHub.Identity.Application/
-│   │       ├── EventHub.Identity.Infrastructure/
-│   │       └── EventHub.Identity.Api/
+│   │   ├── Identity/               # Auth, JWT, refresh token rotation
+│   │   │   ├── Finno.Identity.Domain/
+│   │   │   ├── Finno.Identity.Application/
+│   │   │   ├── Finno.Identity.Infrastructure/
+│   │   │   └── Finno.Identity.Api/
+│   │   ├── Budgeting/              # (kế hoạch) Household, Account, Category, Envelope
+│   │   └── Ledger/                 # (kế hoạch) Transaction, outbox, realtime
 │   └── Shared/
-│       ├── EventHub.SharedKernel/   # Result<T>, Error, ErrorType
-│       ├── EventHub.Modularity/     # IModule, ResultExtensions
-│       └── EventHub.Contracts/      # Integration events giữa các module
+│       ├── Finno.SharedKernel/     # Result<T>, Error, ErrorType
+│       ├── Finno.Modularity/       # IModule, ResultExtensions
+│       └── Finno.Contracts/        # Integration events giữa các module
 ├── docker/                          # Compose + cấu hình
-└── docs/                            # ROADMAP + ADR
+└── docs/                            # ROADMAP + ADR + guides
 ```
 
-Module Events, Ticketing và thư mục `tests/` sẽ thêm theo [lộ trình](docs/ROADMAP.md).
+Module Budgeting, Ledger và thư mục `tests/` sẽ thêm theo [lộ trình](docs/ROADMAP.md).
 
 ---
 
@@ -200,6 +211,7 @@ Các quyết định lớn được ghi lại dưới dạng ADR (Architecture D
 - [ADR-0003: Tránh thư viện đã thương mại hóa, chọn Mapster / NSubstitute / Shouldly](docs/adr/0003-tranh-thu-vien-thuong-mai.md)
 - [ADR-0004: Ranh giới module Identity theo Option A (Dependency Inversion / IIdentityService)](docs/adr/0004-identity-option-a.md)
 - [ADR-0005: Phát JWT bằng short-name claim với IdentityClaimTypes làm source of truth](docs/adr/0005-jwt-short-name-claim.md)
+- [ADR-0006: Chuyển domain sang tài chính gia đình theo envelope budgeting](docs/adr/0006-pivot-sang-tai-chinh-gia-dinh.md)
 
 ADR-0002 ghi quyết định chọn Wolverine, nhưng phần tích hợp thật vẫn chưa làm.
 
@@ -209,12 +221,12 @@ ADR-0002 ghi quyết định chọn Wolverine, nhưng phần tích hợp thật 
 
 Lộ trình phát triển chi tiết 4 tuần xem trong [docs/ROADMAP.md](docs/ROADMAP.md).
 
-- [ ] **Tuần 1**: Nền móng, solution, Identity (auth), Events (CRUD)
+- [ ] **Tuần 1**: Nền móng, solution, Identity (auth), Budgeting (CRUD)
   - [x] Nền móng, solution, bộ khung module
   - [x] Identity: auth, JWT, refresh token rotation
-  - [ ] Events: CRUD
-- [ ] **Tuần 2**: Caching & CDN, HybridCache, invalidation, MinIO
-- [ ] **Tuần 3**: Realtime & Messaging, SignalR, Wolverine outbox, chống overselling
+  - [ ] Budgeting: CRUD Household / Account / Category / Envelope
+- [ ] **Tuần 2**: Caching & CDN, HybridCache cho số dư/report, invalidation, MinIO ảnh hóa đơn
+- [ ] **Tuần 3**: Realtime & Messaging, SignalR số dư, Wolverine outbox, chống chi vượt envelope, import CSV idempotent
 - [ ] **Tuần 4**: DevOps & hoàn thiện, Docker, CI/CD, observability, docs
 
 ---
