@@ -15,7 +15,4 @@
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
   </ItemGroup>
 
-  <PropertyGroup>
-  </PropertyGroup>
-
 </Project>

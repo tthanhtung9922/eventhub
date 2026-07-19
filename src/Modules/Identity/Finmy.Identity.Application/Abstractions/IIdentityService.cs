@@ -1,6 +1,6 @@
 using Finmy.SharedKernel.Results;
 
-namespace Finmy.Identity.Application.Authentication;
+namespace Finmy.Identity.Application.Abstractions;
 
 public record RotatedRefreshToken(Guid UserId, string RawRefreshToken);
 

@@ -1,3 +1,4 @@
+using Finmy.Identity.Application.Abstractions;
 using Finmy.Identity.Application.Authentication.Dto;
 using Finmy.SharedKernel.Results;
 

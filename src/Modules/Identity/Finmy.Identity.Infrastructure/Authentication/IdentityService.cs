@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 
-using Finmy.Identity.Application.Authentication;
+using Finmy.Identity.Application.Abstractions;
 using Finmy.Identity.Domain.Identity;
 using Finmy.Identity.Infrastructure.Identity;
 using Finmy.Identity.Infrastructure.Options;

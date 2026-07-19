@@ -13,6 +13,7 @@ public sealed class IdentityModuleDbContext(DbContextOptions<IdentityModuleDbCon
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.HasDefaultSchema("identity");
 
         modelBuilder.Entity<ApplicationUser>()
             .HasMany(u => u.RefreshTokens)

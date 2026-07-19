@@ -1,4 +1,4 @@
-namespace Finmy.Identity.Application.Authentication;
+namespace Finmy.Identity.Application.Abstractions;
 
 public record AccessTokenOutcome(string Value, DateTime ExpiresAt);
 

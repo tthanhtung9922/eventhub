@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using System.Text;
 
-using Finmy.Identity.Application.Authentication;
+using Finmy.Identity.Application.Abstractions;
 using Finmy.Identity.Infrastructure.Options;
 
 using Microsoft.Extensions.Options;

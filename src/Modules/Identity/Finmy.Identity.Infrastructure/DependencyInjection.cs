@@ -13,6 +13,7 @@ using Finmy.Identity.Application.Authentication;
 using Finmy.Identity.Infrastructure.Options;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Identity;
+using Finmy.Identity.Application.Abstractions;
 
 namespace Finmy.Identity.Infrastructure;
 
