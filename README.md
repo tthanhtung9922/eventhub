@@ -52,13 +52,14 @@ Domain trước đây của repo là bán vé sự kiện; lý do đổi sang ng
   - Seed role Admin/User và admin mặc định qua `IHostedService`, credential đọc từ config.
   - Endpoint (đều dưới prefix `/identity`): `/register`, `/login`, `/refresh`, `/logout`, `/me`, `/admin-only`.
   - Đã qua một vòng security review và siết lại các lỗ hổng tìm thấy.
+- Module **Budgeting** (Day 6, còn dở): tạo Envelope và đọc theo id, Category seed sẵn trong migration, repository + `CreateEnvelopeRequestValidator`, `BudgetingDbContext` riêng schema `budgeting`. Endpoint: `POST /envelopes`, `GET /envelopes/{id}`.
 - `Result<T>` / `Error` / `ErrorType` ở SharedKernel, `GlobalExceptionHandler` trả ProblemDetails không lộ stack trace, `ValidationFilter<T>` + FluentValidation chặn input rác ngay ở endpoint.
 - Docker Compose cho hạ tầng phụ thuộc: PostgreSQL 17, Redis 8, MinIO.
-- 6 ADR ghi lại các quyết định lớn.
+- 7 ADR ghi lại các quyết định lớn, kèm `docs/naming-conventions.md` chốt quy ước đặt tên thư mục/file/namespace.
 
 **Chưa xây:**
 
-Module Budgeting (Space / Account / Category / Envelope), module Ledger (Transaction), Wolverine, SignalR, HybridCache (Redis mới có container, chưa có code dùng), tích hợp MinIO, chống chi vượt envelope, import CSV sao kê idempotent, OpenAPI/Scalar, Serilog, OpenTelemetry, test (unit / integration / architecture), Dockerfile cho API, CI trên GitHub Actions.
+Phần còn lại của Budgeting (Space, Account, list/update/delete Envelope), module Ledger (Transaction), Wolverine, SignalR, HybridCache (Redis mới có container, chưa có code dùng), tích hợp MinIO, chống chi vượt envelope, import CSV sao kê idempotent, OpenAPI/Scalar, Serilog, OpenTelemetry, test (unit / integration / architecture), Dockerfile cho API, CI trên GitHub Actions.
 
 ---
 
@@ -176,17 +177,17 @@ finmy/
 │   │   │   ├── Finmy.Identity.Application/
 │   │   │   ├── Finmy.Identity.Infrastructure/
 │   │   │   └── Finmy.Identity.Api/
-│   │   ├── Budgeting/              # (kế hoạch) Space, Account, Category, Envelope
+│   │   ├── Budgeting/              # Envelope + Category (Day 6); Space, Account kế hoạch
 │   │   └── Ledger/                 # (kế hoạch) Transaction, outbox, realtime
 │   └── Shared/
 │       ├── Finmy.SharedKernel/     # Result<T>, Error, ErrorType
-│       ├── Finmy.Modularity/       # IModule, ResultExtensions
+│       ├── Finmy.Modularity/       # IModule, ResultExtensions, ValidationFilter
 │       └── Finmy.Contracts/        # Integration events giữa các module
 ├── docker/                          # Compose + cấu hình
-└── docs/                            # ROADMAP + ADR + guides
+└── docs/                            # ROADMAP + naming-conventions + ADR + guides
 ```
 
-Module Budgeting, Ledger và thư mục `tests/` sẽ thêm theo [lộ trình](docs/ROADMAP.md).
+Phần còn lại của Budgeting, module Ledger và thư mục `tests/` sẽ thêm theo [lộ trình](docs/ROADMAP.md).
 
 ---
 
