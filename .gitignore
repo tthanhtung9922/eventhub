@@ -496,3 +496,9 @@ docs/guides/
 
 # Superpowers = doc plugin sinh ra (spec brainstorming...), local-only, không track
 docs/superpowers/
+
+# Postman
+.postman/
+
+# Understand Anything
+.ua/
