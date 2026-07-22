@@ -44,9 +44,9 @@ public sealed class BudgetingDbContext(DbContextOptions<BudgetingDbContext> opti
 
         // Seed
         builder.Entity<Category>()
-            .HasData(
-                new { Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), Name = "Ăn uống" },
-                new { Id = Guid.Parse("22222222-2222-2222-2222-222222222222"), Name = "Nhà cửa" }
+            .HasData
+            (
+                new { Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), Name = "Essentials" }
             );
 
         #endregion Category
