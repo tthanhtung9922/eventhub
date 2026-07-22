@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using Finmy.Budgeting.Domain.Envelopes;
 
 using Shouldly;
@@ -31,8 +33,8 @@ public class EnvelopeTests
     [InlineData("2026-01-01 00:00:00 +00:00", "2025-12-31 00:00:00 +00:00")]
     public void Create_WithInvalidPeriod_ReturnsPeriodInvalid(string periodStart, string periodEnd)
     {
-        var periodStartUtc = DateTimeOffset.Parse(periodStart);
-        var periodEndUtc = DateTimeOffset.Parse(periodEnd);
+        var periodStartUtc = DateTimeOffset.Parse(periodStart, CultureInfo.InvariantCulture);
+        var periodEndUtc = DateTimeOffset.Parse(periodEnd, CultureInfo.InvariantCulture);
 
         var result = Envelope.Create(
             "Monthly shopping expenses",
