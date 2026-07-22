@@ -1,17 +1,20 @@
 ﻿using Finmy.Budgeting.Application.Abstractions;
+using Finmy.Budgeting.Application.Caching;
 using Finmy.Budgeting.Application.Envelopes.Dtos;
 using Finmy.Budgeting.Domain.Envelopes;
 using Finmy.SharedKernel.Pagination;
 using Finmy.SharedKernel.Results;
 
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 
 namespace Finmy.Budgeting.Application.Envelopes;
 
 public sealed class EnvelopeService(
     IEnvelopeRepository envelopeRepository,
     ICategoryRepository categoryRepository,
-    HybridCache cache)
+    HybridCache cache,
+    ILogger<EnvelopeService> logger)
 {
     public async Task<Result<Guid>> CreateAsync(CreateEnvelopeRequest request, CancellationToken cancellationToken)
     {
@@ -67,12 +70,14 @@ public sealed class EnvelopeService(
 
     public async Task<PagedResult<EnvelopeResponse>> GetPagedAsync(int page, int pageSize, CancellationToken cancellationToken)
     {
-        var cacheKey = $"envelopes:list:p{page}:s{pageSize}";
+        var cacheKey = $"{BudgetingCachePolicy.EnvelopeListKeyPrefix}:p{page}:s{pageSize}";
 
         var result = await cache.GetOrCreateAsync(
             cacheKey,
             async cancelToken =>
             {
+                logger.LogInformation("Cache MISS {CacheKey}", cacheKey);
+
                 var (items, totalCount) = await envelopeRepository.GetPagedAsync(page, pageSize, cancelToken);
 
                 var mappedItems = items
@@ -90,6 +95,7 @@ public sealed class EnvelopeService(
 
                 return new PagedResult<EnvelopeResponse>(mappedItems, page, pageSize, totalCount);
             },
+            options: BudgetingCachePolicy.EnvelopeListEntry,
             cancellationToken: cancellationToken
         );
 
@@ -125,5 +131,32 @@ public sealed class EnvelopeService(
             envelope.PeriodStartUtc,
             envelope.PeriodEndUtc
         );
+    }
+
+    public async Task<MonthlySummaryResponse> GetMonthlySummaryAsync(int year, int month, CancellationToken cancellationToken)
+    {
+        var monthStartUtc = new DateTimeOffset(year, month, 1, 0, 0, 0, TimeSpan.Zero);
+        var monthEndUtc = monthStartUtc.AddMonths(1);
+
+        // D2: Bắt cả 2 chữ số của tháng => Tháng "07" thay vì "7"
+        var cacheKey = $"{BudgetingCachePolicy.EnvelopeSummaryKeyPrefix}:y{year}:m{month:D2}";
+
+        var result = await cache.GetOrCreateAsync(
+            cacheKey,
+            async cancelToken =>
+            {
+                logger.LogInformation("Cache MISS {CacheKey}", cacheKey);
+
+                var listSummary = await envelopeRepository.GetMonthlySummaryAsync(monthStartUtc, monthEndUtc, cancelToken);
+
+                var grandTotal = listSummary.Sum(x => x.TotalAllocated);
+
+                return new MonthlySummaryResponse(year, month, listSummary, grandTotal);
+            },
+            options: BudgetingCachePolicy.MonthlySummaryEntry,
+            cancellationToken: cancellationToken
+        );
+
+        return result;
     }
 }

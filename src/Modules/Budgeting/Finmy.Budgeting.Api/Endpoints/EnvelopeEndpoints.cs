@@ -50,5 +50,13 @@ public sealed class EnvelopeEndpoints
                 return result.Match(Results.Ok);
             })
             .AddEndpointFilter<ValidationFilter<UpdateEnvelopeRequest>>();
+
+        endpoints
+            .MapGet("/envelopes/summary", async ([AsParameters] MonthlySummaryRequest req, EnvelopeService svc, CancellationToken cancellationToken) =>
+            {
+                var result = await svc.GetMonthlySummaryAsync(req.Year, req.Month, cancellationToken);
+                return Results.Ok(result);
+            })
+            .AddEndpointFilter<ValidationFilter<MonthlySummaryRequest>>();
     }
 }

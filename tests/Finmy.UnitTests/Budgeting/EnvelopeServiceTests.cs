@@ -4,6 +4,7 @@ using Finmy.Budgeting.Application.Envelopes.Dtos;
 using Finmy.Budgeting.Domain.Envelopes;
 
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 
 using NSubstitute;
 
@@ -17,7 +18,7 @@ public class EnvelopeServiceTests
     private static readonly DateTimeOffset PeriodStart = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
     private static readonly DateTimeOffset PeriodEnd = new(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
 
-    private static CreateEnvelopeRequest CreateValidCreateRequest() 
+    private static CreateEnvelopeRequest CreateValidCreateRequest()
         => new("Groceries", "Monthly food budget", CategoryId, 1_500m, PeriodStart, PeriodEnd);
 
     [Fact]
@@ -26,7 +27,8 @@ public class EnvelopeServiceTests
         var envelopeRepo = Substitute.For<IEnvelopeRepository>();
         var categoryRepo = Substitute.For<ICategoryRepository>();
         var cache = Substitute.For<HybridCache>();
-        var service = new EnvelopeService(envelopeRepo, categoryRepo, cache);
+        var logger = Substitute.For<ILogger<EnvelopeService>>();
+        var service = new EnvelopeService(envelopeRepo, categoryRepo, cache, logger);
 
         categoryRepo.ExistsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
 

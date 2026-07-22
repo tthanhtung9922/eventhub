@@ -1,4 +1,5 @@
 ﻿using Finmy.Budgeting.Application.Abstractions;
+using Finmy.Budgeting.Application.Envelopes.Dtos;
 using Finmy.Budgeting.Domain.Envelopes;
 
 using Microsoft.EntityFrameworkCore;
@@ -38,5 +39,37 @@ internal sealed class EnvelopeRepository(BudgetingDbContext dbContext) : IEnvelo
         var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
 
         return (items, totalCount);
+    }
+
+    public async Task<IReadOnlyList<MonthlyCategorySummary>> GetMonthlySummaryAsync(DateTimeOffset monthStartUtc, DateTimeOffset monthEndUtc, CancellationToken cancellationToken)
+    {
+        var envelopes = dbContext.Envelopes;
+        var categories = dbContext.Categories;
+
+        var rawQuery = await envelopes
+            .Join(categories, e => e.CategoryId, c => c.Id, (e, c) => new { Envelope = e, c.Id, c.Name })
+            .Where(x => x.Envelope.PeriodStartUtc < monthEndUtc && x.Envelope.PeriodEndUtc > monthStartUtc)
+            .GroupBy(x => new { x.Id, x.Name })
+            .Select(g => new
+            {
+                CategoryId = g.Key.Id,
+                CategoryName = g.Key.Name,
+                TotalAllocated = g.Sum(x => x.Envelope.Allocated),
+                EnvelopeCount = g.Count()
+            })
+            .OrderBy(s => s.CategoryName)
+            .ToListAsync(cancellationToken);
+
+        var result = rawQuery
+            .Select(x => new MonthlyCategorySummary
+            (
+                CategoryId: x.CategoryId,
+                CategoryName: x.CategoryName,
+                TotalAllocated: x.TotalAllocated,
+                EnvelopeCount: x.EnvelopeCount
+            ))
+            .ToList();
+
+        return result;
     }
 }
