@@ -3,6 +3,7 @@ using System;
 using Finmy.Budgeting.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Finmy.Budgeting.Infrastructure.Migrations
 {
     [DbContext(typeof(BudgetingDbContext))]
-    partial class BudgetingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260722165719_AddReceipt")]
+    partial class AddReceipt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -111,8 +114,7 @@ namespace Finmy.Budgeting.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ObjectKey")
-                        .IsUnique();
+                    b.HasIndex("ObjectKey");
 
                     b.ToTable("Receipts", "budgeting");
                 });

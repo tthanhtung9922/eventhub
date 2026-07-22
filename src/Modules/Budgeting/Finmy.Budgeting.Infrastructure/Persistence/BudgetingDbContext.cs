@@ -1,5 +1,6 @@
 using Finmy.Budgeting.Domain.Categories;
 using Finmy.Budgeting.Domain.Envelopes;
+using Finmy.Budgeting.Domain.Receipts;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -9,6 +10,7 @@ public sealed class BudgetingDbContext(DbContextOptions<BudgetingDbContext> opti
 {
     public DbSet<Envelope> Envelopes { get; set; }
     public DbSet<Category> Categories { get; set; }
+    public DbSet<Receipt> Receipts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -50,5 +52,27 @@ public sealed class BudgetingDbContext(DbContextOptions<BudgetingDbContext> opti
             );
 
         #endregion Category
+
+        #region Receipt
+
+        builder.Entity<Receipt>()
+            .Property(x => x.ObjectKey)
+            .HasMaxLength(200)
+            .IsRequired();
+
+        builder.Entity<Receipt>()
+            .HasIndex(x => x.ObjectKey)
+            .IsUnique();
+
+        builder.Entity<Receipt>()
+            .Property(x => x.ContentType)
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.Entity<Receipt>()
+            .Property(x => x.OriginalFileName)
+            .HasMaxLength(255);
+
+        #endregion Receipt
     }
 }

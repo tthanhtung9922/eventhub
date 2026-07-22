@@ -24,5 +24,6 @@ public sealed class BudgetingModule : IModule
     public void MapEndpoints(IEndpointRouteBuilder endpoints)
     {
         EnvelopeEndpoints.MapEndpoints(endpoints);
+        ReceiptEndpoints.MapEndpoints(endpoints);
     }
 }
