@@ -1,4 +1,4 @@
-namespace Finmy.Identity.Infrastructure.Options;
+namespace Finmy.Identity.Infrastructure.Authentication;
 
 public class JwtOptions
 {

@@ -3,7 +3,6 @@ using System.Security.Cryptography;
 using Finmy.Identity.Application.Abstractions;
 using Finmy.Identity.Domain.RefreshTokens;
 using Finmy.Identity.Infrastructure.Users;
-using Finmy.Identity.Infrastructure.Options;
 using Finmy.Identity.Infrastructure.Persistence;
 using Finmy.SharedKernel.Results;
 

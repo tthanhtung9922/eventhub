@@ -10,7 +10,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Finmy.Identity.Application.Authentication;
-using Finmy.Identity.Infrastructure.Options;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Identity;
 using Finmy.Identity.Application.Abstractions;
@@ -23,9 +22,6 @@ public static class DependencyInjection
     {
         // Configure DbContext
         AddDbContext(services, configuration);
-
-        // Configure Hosted Service
-        services.AddHostedService<IdentitySeederHostedService>();
 
         // Configure Identity
         services.AddIdentityCore<ApplicationUser>()
@@ -47,6 +43,9 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IIdentityService, IdentityService>();
         services.AddScoped<AuthService>();
+
+        // Configure Hosted Service
+        services.AddHostedService<IdentitySeederHostedService>();
 
         return services;
     }

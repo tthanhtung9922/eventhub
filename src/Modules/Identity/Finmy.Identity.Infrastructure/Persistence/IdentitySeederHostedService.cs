@@ -1,5 +1,4 @@
 using Finmy.Identity.Infrastructure.Users;
-using Finmy.Identity.Infrastructure.Options;
 
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
