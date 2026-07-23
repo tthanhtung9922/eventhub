@@ -25,11 +25,14 @@ public class S3ReceiptStorage(IAmazonS3 s3, IOptions<S3StorageOptions> options) 
 
     public string GetPresignedUrl(string objectKey)
     {
+        var protocol = new Uri(options.Value.Endpoint).Scheme == Uri.UriSchemeHttps ? Protocol.HTTPS : Protocol.HTTP;
+
         var request = new GetPreSignedUrlRequest
         {
             BucketName = options.Value.Bucket,
             Key = objectKey,
             Verb = HttpVerb.GET,
+            Protocol = protocol,
             Expires = DateTime.UtcNow.AddMinutes(options.Value.PresignedUrlLifetimeMinutes)
         };
 

@@ -77,7 +77,16 @@ public static class DependencyInjection
     {
         services.AddOptions<S3StorageOptions>()
             .Bind(configuration.GetSection(S3StorageOptions.SectionName))
+            .Validate(o => !string.IsNullOrWhiteSpace(o.Endpoint),
+                $"S3StorageOptions {nameof(S3StorageOptions.Endpoint)} is not configured.")
+            .Validate(o => !string.IsNullOrWhiteSpace(o.Bucket),
+                $"S3StorageOptions {nameof(S3StorageOptions.Bucket)} is not configured.")
+            .Validate(o => !string.IsNullOrWhiteSpace(o.AccessKey),
+                $"S3StorageOptions {nameof(S3StorageOptions.AccessKey)} is not configured.")
+            .Validate(o => !string.IsNullOrWhiteSpace(o.SecretKey),
+                $"S3StorageOptions {nameof(S3StorageOptions.SecretKey)} is not configured.")
             .Validate(o => o.PresignedUrlLifetimeMinutes > 0,
-                $"S3 Storage {nameof(S3StorageOptions.PresignedUrlLifetimeMinutes)} must be > 0.");
+                $"S3 Storage {nameof(S3StorageOptions.PresignedUrlLifetimeMinutes)} must be > 0.")
+            .ValidateOnStart();
     }
 }
