@@ -18,4 +18,12 @@ public static class ReceiptErrors
         "Receipt.SizeNotPositive",
         "The receipt size must be greater than zero.",
         ErrorType.Validation);
+
+    public static Error NotFound(Guid receiptId)
+    {
+        return new(
+            "Receipt.NotFound",
+            $"Receipt with Id '{receiptId}' was not found.",
+            ErrorType.NotFound);
+    }
 }

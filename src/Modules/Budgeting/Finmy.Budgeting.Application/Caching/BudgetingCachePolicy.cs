@@ -33,4 +33,11 @@ public static class BudgetingCachePolicy
         Expiration = TimeSpan.FromMinutes(10),
         LocalCacheExpiration = TimeSpan.FromMinutes(2)
     };
+
+    public const string ReceiptMetaKeyPrefix = "receipts:meta";
+    public static readonly HybridCacheEntryOptions ReceiptMetaEntry = new()
+    {
+        Expiration = TimeSpan.FromMinutes(30),
+        LocalCacheExpiration = TimeSpan.FromMinutes(5)
+    };
 }

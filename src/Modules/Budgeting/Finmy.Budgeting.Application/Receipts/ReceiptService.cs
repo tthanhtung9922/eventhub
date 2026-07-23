@@ -1,11 +1,19 @@
 ﻿using Finmy.Budgeting.Application.Abstractions;
+using Finmy.Budgeting.Application.Caching;
 using Finmy.Budgeting.Application.Receipts.Dtos;
 using Finmy.Budgeting.Domain.Receipts;
 using Finmy.SharedKernel.Results;
 
+using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
+
 namespace Finmy.Budgeting.Application.Receipts;
 
-public sealed class ReceiptService(IReceiptStorage receiptStorage, IReceiptRepository receiptRepository)
+public sealed class ReceiptService(
+    IReceiptStorage receiptStorage,
+    IReceiptRepository receiptRepository,
+    ILogger<ReceiptService> logger,
+    HybridCache cache)
 {
     public async Task<Result<UploadReceiptResponse>> UploadAsync(Stream content, long sizeBytes, string contentType, string originalFileName, CancellationToken cancellationToken)
     {
@@ -33,5 +41,31 @@ public sealed class ReceiptService(IReceiptStorage receiptStorage, IReceiptRepos
         var url = receiptStorage.GetPresignedUrl(objectKey);
 
         return new UploadReceiptResponse(receipt.Value.Id, url);
+    }
+
+    public async Task<Result<string>> GetForServingAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var cacheKey = $"{BudgetingCachePolicy.ReceiptMetaKeyPrefix}:{id}";
+
+        var meta = await cache.GetOrCreateAsync(
+            cacheKey,
+            async cancelToken =>
+            {
+                logger.LogInformation("Cache MISS {CacheKey}", cacheKey);
+
+                var receipt = await receiptRepository.GetByIdAsync(id, cancelToken);
+
+                return receipt is null ? null : new ReceiptMetadata(receipt.ObjectKey, receipt.ContentType);
+            },
+            options: BudgetingCachePolicy.ReceiptMetaEntry,
+            cancellationToken: cancellationToken
+        );
+
+        if (meta is null)
+            return ReceiptErrors.NotFound(id);
+
+        var url = receiptStorage.GetPresignedUrl(meta.ObjectKey);
+
+        return url;
     }
 }
